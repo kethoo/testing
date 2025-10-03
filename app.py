@@ -3,12 +3,15 @@ from docx import Document
 from docx.enum.text import WD_COLOR_INDEX
 import re, io
 
-def highlight_in_runs(runs, patterns):
-    """Highlight matches inside a list of runs (paragraph or table cell)."""
-    text = "".join(run.text for run in runs)
+def highlight_in_runs(para, patterns):
+    """Highlight matches inside a paragraph (runs may be empty)."""
+    if not para.text.strip():
+        return  # skip empty paragraphs
+    
+    text = para.text
     for pattern in patterns:
         if re.search(pattern, text):
-            # Rebuild runs with highlighting
+            # Rebuild text with highlighting
             new_runs = []
             last_end = 0
             for match in re.finditer(pattern, text):
@@ -20,14 +23,14 @@ def highlight_in_runs(runs, patterns):
                 new_runs.append((text[last_end:], False))
 
             # Clear old runs
-            for run in runs:
+            for run in para.runs:
                 run.text = ""
-            # Add new runs
+            # Add new runs directly to the paragraph
             for run_text, is_highlight in new_runs:
-                run = runs[0].paragraph.add_run(run_text)
+                run = para.add_run(run_text)
                 if is_highlight:
                     run.font.highlight_color = WD_COLOR_INDEX.YELLOW
-            break  # no need to re-check with the same pattern
+            break  # stop checking more patterns for this paragraph
 
 def highlight_docx(file, terms):
     doc = Document(file)
@@ -35,14 +38,14 @@ def highlight_docx(file, terms):
 
     # Highlight in paragraphs
     for para in doc.paragraphs:
-        highlight_in_runs(para.runs, patterns)
+        highlight_in_runs(para, patterns)
 
     # Highlight in tables
     for table in doc.tables:
         for row in table.rows:
             for cell in row.cells:
                 for para in cell.paragraphs:
-                    highlight_in_runs(para.runs, patterns)
+                    highlight_in_runs(para, patterns)
 
     output = io.BytesIO()
     doc.save(output)
